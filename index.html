@@ -1,0 +1,372 @@
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MONDRAGON — Transformer votre monde</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f6f3;--ink:#141414;--muted:#6f6f6a;--accent:#b5541d;--line:rgba(20,20,20,.14)}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,-apple-system,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+canvas{display:block;position:fixed;inset:0}
+.ui{position:fixed;inset:0;pointer-events:none;z-index:5}
+.ui::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 42%,transparent 55%,rgba(20,20,20,.07) 100%)}
+.fade{opacity:0;animation:fadeUp .9s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.brand{position:absolute;top:30px;left:36px;display:flex;align-items:center;gap:13px}
+.brand .mark{width:12px;height:12px;border-radius:50%;background:var(--accent);transition:background .5s;animation:pulse 3s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 4px rgba(120,80,50,.12)}50%{box-shadow:0 0 0 10px rgba(120,80,50,.04)}}
+.brand span{font-size:13px;letter-spacing:.34em;font-weight:600}
+.meta{position:absolute;top:32px;right:36px;text-align:right;font-size:11px;letter-spacing:.22em;color:var(--muted);line-height:1.9}
+.chip{display:inline-block;margin-top:10px;padding:8px 15px;border:1px solid var(--line);border-radius:999px;color:var(--ink);font-size:10px;letter-spacing:.2em;background:rgba(255,255,255,.55);backdrop-filter:blur(6px)}
+.chip b{color:var(--accent);transition:color .5s}
+.hero{position:absolute;left:36px;bottom:44px;max-width:540px}
+.eyebrow{font-size:11px;letter-spacing:.3em;color:var(--muted);margin-bottom:18px}
+h1{font-family:'Fraunces',Georgia,serif;font-weight:300;font-size:clamp(38px,6vw,64px);line-height:1.02;letter-spacing:-.01em;margin-bottom:18px}
+h1 em{font-style:italic;color:var(--accent);transition:color .5s}
+p.desc{font-size:14px;line-height:1.7;color:var(--muted);margin-bottom:28px;max-width:430px}
+.btn{pointer-events:auto;cursor:pointer;display:inline-flex;align-items:center;gap:11px;padding:16px 29px;border:1px solid var(--ink);border-radius:999px;background:transparent;color:var(--ink);font-family:'Inter',sans-serif;font-size:12px;letter-spacing:.22em;font-weight:600;text-transform:uppercase;transition:all .35s cubic-bezier(.2,.8,.2,1)}
+.btn .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);transition:background .5s}
+.btn:hover{background:var(--ink);color:var(--bg);transform:translateY(-2px);box-shadow:0 14px 30px rgba(20,20,20,.16)}
+.hint{position:absolute;bottom:46px;right:36px;font-size:10px;letter-spacing:.16em;color:var(--muted);text-align:right;line-height:2}
+#tooltip{position:fixed;z-index:9;pointer-events:none;padding:7px 13px;background:var(--ink);color:var(--bg);font-size:10px;letter-spacing:.18em;border-radius:6px;transform:translate(15px,15px);opacity:0;transition:opacity .2s;white-space:nowrap}
+@media(max-width:720px){.hero{left:22px;right:22px;bottom:26px}.brand{left:22px;top:22px}.meta{right:22px;top:24px}.hint{display:none}}
+</style>
+</head>
+<body>
+<div class="ui">
+  <div class="brand fade"><div class="mark"></div><span>MONDRAGON</span></div>
+  <div class="meta fade" style="animation-delay:.15s">STUDIO — 3D<br>VERSION 02<br><span class="chip">FORME&nbsp;·&nbsp;<b id="state">ICOSPHÈRE</b></span></div>
+  <div class="hero fade" style="animation-delay:.3s">
+    <div class="eyebrow">TRANSFORMATION — EXPÉRIENCE TEMPS RÉEL</div>
+    <h1>Une forme,<br><em>deux mondes.</em></h1>
+    <p class="desc">Un espace vivant dont la géométrie répond à votre regard. Explorez librement, puis déclenchez la bascule — le monde se réinvente en un geste.</p>
+    <button class="btn" id="morphBtn"><span class="dot"></span>Lancer la transformation</button>
+  </div>
+  <div class="hint fade" style="animation-delay:.45s">GLISSER — EXPLORER<br>MOLETTE — ZOOM<br>CLIC SUR LE CŒUR — TRANSFORMER</div>
+</div>
+<div id="tooltip">FRAGMENT</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  const BG = 0xf6f6f3;
+  const ACCENTS = [0xb5541d, 0x2e5cff];
+  const ACCENT_CSS = ['#b5541d', '#2e5cff'];
+  let accentIdx = 0;
+
+  // ----- Scene / Camera / Renderer -----
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(BG, 13, 28);
+
+  const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, .1, 100);
+  camera.position.set(0, .6, 9.5);
+
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setClearColor(BG, 1);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+  const el = renderer.domElement;
+  el.style.cursor = 'grab';
+
+  // ----- Lights -----
+  scene.add(new THREE.AmbientLight(0xffffff, .78));
+  const sun = new THREE.DirectionalLight(0xffffff, .95);
+  sun.position.set(6, 10, 7);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 32;
+  sun.shadow.camera.left = -9; sun.shadow.camera.right = 9;
+  sun.shadow.camera.top = 9; sun.shadow.camera.bottom = -9;
+  sun.shadow.bias = -0.0005;
+  scene.add(sun);
+  const accentLight = new THREE.PointLight(ACCENTS[0], .8, 32);
+  accentLight.position.set(-5, 3.5, -4);
+  scene.add(accentLight);
+
+  // ----- Ground -----
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(60,60), new THREE.ShadowMaterial({opacity:.1}));
+  ground.rotation.x = -Math.PI/2; ground.position.y = -3.4; ground.receiveShadow = true;
+  scene.add(ground);
+  const grid = new THREE.GridHelper(34, 34, 0xcfcfc8, 0xe3e3db);
+  grid.position.y = -3.39;
+  scene.add(grid);
+
+  // ----- World -----
+  const world = new THREE.Group();
+  scene.add(world);
+
+  const coreGroup = new THREE.Group();
+  world.add(coreGroup);
+
+  const geoA = new THREE.IcosahedronGeometry(1.8, 1);
+  const geoB = new THREE.TorusKnotGeometry(1.12, .38, 180, 24, 2, 3);
+
+  const meshA = new THREE.Mesh(geoA, new THREE.MeshStandardMaterial({color:0x161616, roughness:.32, metalness:.25, flatShading:true}));
+  const meshB = new THREE.Mesh(geoB, new THREE.MeshStandardMaterial({color:0x161616, roughness:.32, metalness:.25, flatShading:true}));
+  meshA.castShadow = meshB.castShadow = true;
+  meshB.visible = false;
+
+  const wireA = new THREE.Mesh(geoA, new THREE.MeshBasicMaterial({wireframe:true, transparent:true, opacity:.28, color:ACCENTS[0]}));
+  const wireB = new THREE.Mesh(geoB, new THREE.MeshBasicMaterial({wireframe:true, transparent:true, opacity:.28, color:ACCENTS[0]}));
+  wireA.scale.setScalar(1.02); wireB.scale.setScalar(1.02);
+  wireB.visible = false;
+  coreGroup.add(meshA, meshB, wireA, wireB);
+
+  const baseA = geoA.attributes.position.array.slice();
+  const baseB = geoB.attributes.position.array.slice();
+
+  // ----- Dust points -----
+  const pCount = 320;
+  const pArr = new Float32Array(pCount*3);
+  for(let i=0;i<pCount;i++){
+    const r = 3.6 + Math.random()*5.4;
+    const th = Math.random()*Math.PI*2;
+    const ph = Math.acos(2*Math.random()-1);
+    pArr[i*3]   = r*Math.sin(ph)*Math.cos(th);
+    pArr[i*3+1] = r*Math.cos(ph)*.8;
+    pArr[i*3+2] = r*Math.sin(ph)*Math.sin(th);
+  }
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pArr, 3));
+  const dust = new THREE.Points(pGeo, new THREE.PointsMaterial({color:0x8f8f88, size:.035, transparent:true, opacity:.6}));
+  world.add(dust);
+
+  // ----- Orbit fragments -----
+  const inkCol = new THREE.Color(0x161616);
+  const accentCol = new THREE.Color(ACCENTS[0]);
+  const orbMeshes = [];
+  const orbGroup = new THREE.Group();
+  world.add(orbGroup);
+  for(let i=0;i<12;i++){
+    const size = .07 + Math.random()*.09;
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(size, 20, 16),
+      new THREE.MeshStandardMaterial({color:0x161616, roughness:.35, metalness:.2})
+    );
+    m.castShadow = true;
+    m.userData = {
+      orb:true,
+      name:'Fragment ' + String(i+1).padStart(2,'0'),
+      theta:Math.random()*Math.PI*2,
+      radius:3.2 + Math.random()*1.5,
+      speed:(.12 + Math.random()*.22) * (Math.random()<.5 ? -1 : 1),
+      yBase:(Math.random()-.5)*2.6,
+      bob:Math.random()*Math.PI*2,
+      hover:false, pulse:0, scale:1
+    };
+    orbGroup.add(m);
+    orbMeshes.push(m);
+  }
+
+  // ----- State -----
+  let current = 'icosa';
+  let morphT = 0, swapped = false, flash = 0;
+  const stateEl = document.getElementById('state');
+  const tooltip = document.getElementById('tooltip');
+
+  function swapForm(){
+    current = (current === 'icosa') ? 'knot' : 'icosa';
+    const isA = current === 'icosa';
+    meshA.visible = wireA.visible = isA;
+    meshB.visible = wireB.visible = !isA;
+    accentIdx = 1 - accentIdx;
+    accentCol.set(ACCENTS[accentIdx]);
+    wireA.material.color.copy(accentCol);
+    wireB.material.color.copy(accentCol);
+    accentLight.color.copy(accentCol);
+    document.documentElement.style.setProperty('--accent', ACCENT_CSS[accentIdx]);
+    stateEl.textContent = isA ? 'ICOSPHÈRE' : 'NŒUD TORIQUE';
+    flash = 1;
+  }
+  function triggerMorph(){
+    if(morphT > 0) return;
+    morphT = 1e-4;
+    swapped = false;
+  }
+  document.getElementById('morphBtn').addEventListener('click', triggerMorph);
+
+  // ----- Breathing -----
+  function breatheGeo(geo, base, t, amp){
+    const pos = geo.attributes.position;
+    const arr = pos.array;
+    for(let i=0;i<arr.length;i+=3){
+      const x=base[i], y=base[i+1], z=base[i+2];
+      const len = Math.sqrt(x*x+y*y+z*z) || 1;
+      const d = Math.sin(t*1.6 + x*1.9 + y*1.4 + z*1.7) * amp;
+      arr[i]   = x + (x/len)*d;
+      arr[i+1] = y + (y/len)*d;
+      arr[i+2] = z + (z/len)*d;
+    }
+    pos.needsUpdate = true;
+  }
+
+  // ----- Interaction -----
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  let dragging=false, lastX=0, lastY=0, downTime=0, moved=0;
+  let inertiaX=0, inertiaY=0;
+  let camZ=9.5, camZTarget=9.5;
+  let parX=0, parY=0, parTX=0, parTY=0;
+  let hovered=null;
+
+  function pick(cx, cy){
+    ndc.x = (cx/innerWidth)*2 - 1;
+    ndc.y = -(cy/innerHeight)*2 + 1;
+    raycaster.setFromCamera(ndc, camera);
+    const targets = orbMeshes.concat([meshA.visible ? meshA : meshB]);
+    const hits = raycaster.intersectObjects(targets);
+    return hits.length ? hits[0].object : null;
+  }
+
+  function updateHover(cx, cy){
+    const obj = pick(cx, cy);
+    if(hovered && hovered.userData && hovered.userData.orb) hovered.userData.hover = false;
+    hovered = obj;
+    if(obj){
+      if(obj.userData.orb){
+        obj.userData.hover = true;
+        tooltip.textContent = obj.userData.name.toUpperCase();
+      } else {
+        tooltip.textContent = 'CLIC · TRANSFORMER';
+      }
+      tooltip.style.opacity = 1;
+      el.style.cursor = 'pointer';
+    } else {
+      tooltip.style.opacity = 0;
+      el.style.cursor = 'grab';
+    }
+  }
+
+  el.addEventListener('pointerdown', e=>{
+    dragging = true; moved = 0;
+    lastX = e.clientX; lastY = e.clientY;
+    downTime = performance.now();
+    tooltip.style.opacity = 0;
+    el.style.cursor = 'grabbing';
+    el.setPointerCapture(e.pointerId);
+  });
+
+  window.addEventListener('pointermove', e=>{
+    parTX = (e.clientX/innerWidth)*2 - 1;
+    parTY = -((e.clientY/innerHeight)*2 - 1);
+    if(dragging){
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      moved += Math.abs(dx) + Math.abs(dy);
+      const rx = dx*.005, ry = dy*.004;
+      world.rotation.y += rx;
+      world.rotation.x = THREE.MathUtils.clamp(world.rotation.x + ry, -.55, .55);
+      inertiaY = rx; inertiaX = ry;
+      lastX = e.clientX; lastY = e.clientY;
+    } else {
+      updateHover(e.clientX, e.clientY);
+      tooltip.style.left = e.clientX + 'px';
+      tooltip.style.top = e.clientY + 'px';
+    }
+  });
+
+  window.addEventListener('pointerup', e=>{
+    if(!dragging) return;
+    dragging = false;
+    el.style.cursor = 'grab';
+    if(moved < 6 && performance.now() - downTime < 500){
+      const obj = pick(e.clientX, e.clientY);
+      if(obj){
+        if(obj.userData.orb) obj.userData.pulse = 1;
+        else triggerMorph();
+      }
+    }
+  });
+
+  el.addEventListener('wheel', e=>{
+    e.preventDefault();
+    camZTarget = THREE.MathUtils.clamp(camZTarget + e.deltaY*.006, 6, 14);
+  }, {passive:false});
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  // ----- Loop -----
+  const clock = new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), .05);
+    const t = clock.elapsedTime;
+
+    // Idle motion / inertia
+    if(!dragging){
+      world.rotation.y += .0016 + inertiaY;
+      world.rotation.x = THREE.MathUtils.clamp(world.rotation.x + inertiaX, -.55, .55);
+      inertiaY *= .95; inertiaX *= .95;
+    }
+
+    // Morph
+    if(morphT > 0){
+      morphT += dt;
+      const HALF = .45, TOTAL = 1.15;
+      if(morphT >= HALF && !swapped){ swapForm(); swapped = true; }
+      let s;
+      if(morphT < HALF){
+        const k = morphT/HALF;
+        s = 1 - k*k*k;
+      } else {
+        const k = Math.min((morphT-HALF)/(TOTAL-HALF), 1);
+        const c1 = 1.70158, c3 = c1 + 1;
+        s = 1 + c3*Math.pow(k-1,3) + c1*Math.pow(k-1,2);
+      }
+      coreGroup.scale.setScalar(Math.max(s, .0001));
+      coreGroup.rotation.y += dt*7*(1 - Math.min(Math.max(s,0),1)*.5);
+      if(morphT >= TOTAL){ morphT = 0; coreGroup.scale.setScalar(1); }
+    }
+    flash = Math.max(0, flash - dt*2.1);
+    accentLight.intensity = .8 + flash*2.4;
+
+    // Core motion
+    coreGroup.rotation.y += dt*.22;
+    meshA.rotation.x += dt*.18; meshA.rotation.y += dt*.22;
+    meshB.rotation.x -= dt*.14; meshB.rotation.y += dt*.18;
+    if(current === 'icosa') breatheGeo(geoA, baseA, t, .055);
+    else breatheGeo(geoB, baseB, t, .03);
+
+    // Orbs
+    for(const m of orbMeshes){
+      const u = m.userData;
+      u.theta += u.speed*dt;
+      m.position.set(
+        Math.cos(u.theta)*u.radius,
+        u.yBase + Math.sin(t*1.1 + u.bob)*.3,
+        Math.sin(u.theta)*u.radius
+      );
+      const target = (u.hover ? 1.8 : 1) + u.pulse*1.1;
+      u.scale += (target - u.scale)*.18;
+      m.scale.setScalar(u.scale);
+      m.material.color.lerp(u.hover ? accentCol : inkCol, .25);
+      u.pulse = Math.max(0, u.pulse - dt*1.4);
+    }
+
+    // Dust
+    dust.rotation.y -= dt*.05;
+    dust.rotation.x = Math.sin(t*.3)*.1;
+
+    // Camera
+    parX += (parTX - parX)*.05;
+    parY += (parTY - parY)*.05;
+    camZ += (camZTarget - camZ)*.08;
+    camera.position.set(parX*.7, .6 + parY*.5, camZ);
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+</body>
+</html>
