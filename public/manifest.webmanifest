@@ -1,0 +1,21 @@
+{
+  "name": "MONDE-M — Studio 3D & cartes musicales",
+  "short_name": "MONDE-M",
+  "description": "Studio 3D. Projets publiés et cartes musicales universelles : identité, rôle, disponibilités et morceau réunis dans un seul objet partageable.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f6f3",
+  "theme_color": "#f6f6f3",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

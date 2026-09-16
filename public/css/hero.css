@@ -1,0 +1,391 @@
+/* ------------------------------------------------------------------
+   MONDE-M — hero 3D
+   La scène reste exactement celle d'origine : canvas fixe en fond,
+   textes éditoriaux dans les coins. Ce qui change (audit §8) :
+   les fragments portent désormais des cartes, et la page défile.
+   ------------------------------------------------------------------ */
+
+#scene-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-canvas);
+  width: 100%;
+  height: 100%;
+  touch-action: none; /* le geste de rotation ne doit pas faire défiler */
+  cursor: grab;
+}
+#scene-canvas.is-dragging {
+  cursor: grabbing;
+}
+#scene-canvas.is-pointing {
+  cursor: pointer;
+}
+
+/* Voile qui assombrit la scène quand le contenu défile au-dessus. */
+.hero-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 42%, transparent 55%, rgba(20, 20, 20, 0.07) 100%);
+  transition: opacity var(--slow) var(--ease);
+}
+
+.hero {
+  position: relative;
+  z-index: var(--z-content);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+.hero > * {
+  pointer-events: auto;
+}
+
+.hero-meta {
+  position: absolute;
+  top: 5.5rem;
+  right: var(--gutter);
+  text-align: right;
+  font-size: var(--step--1);
+  letter-spacing: var(--track-wide);
+  color: var(--muted-strong);
+  line-height: 1.9;
+  pointer-events: none;
+}
+
+.hero-body {
+  margin-top: auto;
+  margin-bottom: var(--space-7);
+  max-width: 34rem;
+  pointer-events: none;
+}
+.hero-body > * {
+  pointer-events: auto;
+}
+.hero-body .eyebrow {
+  margin-bottom: var(--space-4);
+}
+.hero-body h1 {
+  margin-bottom: var(--space-4);
+}
+.hero-body .desc {
+  font-size: var(--step-0);
+  line-height: 1.7;
+  color: var(--muted);
+  margin-bottom: var(--space-6);
+  max-width: 27rem;
+}
+
+.hero-cta {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.hero-hint {
+  position: absolute;
+  bottom: var(--space-6);
+  right: var(--gutter);
+  font-size: var(--step--1);
+  letter-spacing: 0.14em;
+  color: var(--muted-strong);
+  text-align: right;
+  line-height: 2;
+  pointer-events: none;
+}
+
+/* Équivalent textuel de la scène : visible au clavier, caché à la souris.
+   C'est la correction d'accessibilité majeure du hero (audit §9). */
+.hero-cardlist {
+  position: absolute;
+  left: var(--gutter);
+  bottom: var(--space-6);
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  max-width: 30rem;
+  list-style: none;
+}
+.hero-cardlist button {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  border-radius: var(--radius-pill);
+  padding: 0.35rem 0.8rem;
+  font-size: var(--step--1);
+  cursor: pointer;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.hero-cardlist button:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* Tooltip suiveur de la scène */
+#tooltip {
+  position: fixed;
+  z-index: var(--z-overlay);
+  pointer-events: none;
+  padding: 0.4rem 0.8rem;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: var(--step--1);
+  letter-spacing: 0.12em;
+  border-radius: var(--radius-sm);
+  transform: translate(15px, 15px);
+  opacity: 0;
+  transition: opacity 0.2s var(--ease);
+  white-space: nowrap;
+  max-width: min(80vw, 26rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------------ */
+/* Panneau de carte — ouvert au clic sur un fragment                   */
+/* ------------------------------------------------------------------ */
+
+.card-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(26rem, 100vw);
+  z-index: var(--z-panel);
+  background: var(--bg-raised);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(102%);
+  transition: transform var(--med) var(--ease);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.card-panel.is-open {
+  transform: none;
+}
+.card-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-soft);
+  flex: none;
+}
+.card-panel-body {
+  padding: var(--space-5);
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+}
+.card-panel-close {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: var(--radius-pill);
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+  line-height: 1;
+  font-size: var(--step-1);
+  display: grid;
+  place-items: center;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.card-panel-close:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-panel) - 1);
+  background: rgba(20, 20, 20, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--med) var(--ease);
+}
+.panel-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Pochette + lecteur                                                  */
+/* ------------------------------------------------------------------ */
+
+.cover {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-sunken);
+  box-shadow: var(--shadow);
+}
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Pochette de repli : générée à partir des couleurs dominantes du morceau. */
+.cover--fallback {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  font-style: italic;
+}
+.cover--fallback::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.22), transparent 60%);
+}
+
+.player {
+  display: grid;
+  gap: var(--space-3);
+}
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.play-btn {
+  flex: none;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 1px solid var(--ink);
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease),
+    transform var(--fast) var(--ease);
+}
+.play-btn:hover {
+  background: var(--ink);
+  color: var(--bg);
+  transform: scale(1.05);
+}
+.play-btn .icon-pause {
+  display: none;
+}
+.play-btn[aria-pressed='true'] .icon-play {
+  display: none;
+}
+.play-btn[aria-pressed='true'] .icon-pause {
+  display: block;
+}
+.progress {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+  cursor: pointer;
+}
+.progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.1s linear, background 0.5s var(--ease);
+}
+
+/* Visualiseur : anneaux concentriques pilotés par l'AnalyserNode */
+.visualizer {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 1.75rem;
+}
+.visualizer span {
+  flex: 1;
+  background: var(--accent);
+  border-radius: 1px;
+  height: 12%;
+  transition: height 0.08s linear, background 0.5s var(--ease);
+}
+
+/* ------------------------------------------------------------------ */
+/* Contenu sous le hero                                                */
+/* ------------------------------------------------------------------ */
+
+.page-content {
+  position: relative;
+  z-index: var(--z-content);
+  background: var(--bg);
+}
+
+/* Fragment « nouvelle carte » dans le mur de pochettes */
+.cover-stack {
+  display: grid;
+  gap: var(--space-4);
+}
+.cover-card {
+  text-decoration: none;
+  display: grid;
+  gap: var(--space-3);
+}
+.cover-card .who {
+  font-weight: 600;
+  font-size: var(--step-0);
+}
+.cover-card .what {
+  font-size: var(--step--1);
+  color: var(--muted-strong);
+  line-height: 1.6;
+}
+.cover-card:hover .cover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+.cover-card .cover {
+  transition: transform var(--med) var(--ease), box-shadow var(--med) var(--ease);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 720px) {
+  .hero-meta {
+    top: 5rem;
+    font-size: 10px;
+  }
+  .hero-hint {
+    display: none;
+  }
+  .hero-body {
+    margin-bottom: var(--space-6);
+  }
+  .hero-cardlist {
+    position: static;
+    margin-top: var(--space-5);
+    max-width: none;
+  }
+  .card-panel {
+    width: 100vw;
+    border-left: none;
+  }
+}
+
+/* Écrans courts en paysage : le hero ne doit pas écraser la scène. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .hero {
+    min-height: 100vh;
+  }
+  .hero-body .desc {
+    display: none;
+  }
+  .hero-meta,
+  .hero-hint {
+    display: none;
+  }
+}

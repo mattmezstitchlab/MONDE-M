@@ -1,0 +1,24 @@
+{
+  "name": "monde-m",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MONDE-M — site de studio avec hero 3D, publication de projets et carte universelle musicale.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "seed": "node server/seed.js --force",
+    "smoke": "node --test tests/smoke.test.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "three": "0.128.0"
+  }
+}

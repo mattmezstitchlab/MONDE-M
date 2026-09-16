@@ -1,0 +1,19 @@
+# Dépendances
+node_modules/
+
+# Contenus réels saisis depuis l'admin (le seed versionné est dans server/seed-data.js)
+data/*.json
+!data/.gitkeep
+public/media/covers/*
+public/media/previews/*
+public/media/uploads/*
+!public/media/**/.gitkeep
+
+# Secrets et configuration locale
+.env
+.env.local
+
+# Divers
+.DS_Store
+*.log
+npm-debug.log*
